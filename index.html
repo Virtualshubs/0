@@ -17,11 +17,16 @@
     text-align: center;
     font-size: 18px;
   }
+  /* Contenedor invisible para render inicial */
+  #tempContainer {
+    display: none;
+  }
 </style>
 </head>
 <body>
 
 <div id="status">Cargando GLB…</div>
+<div id="tempContainer"></div>
 
 <script>
 /* ----------------------------------------------------------
@@ -99,7 +104,7 @@ function buildEncodedURL(base, params) {
 }
 
 /* ----------------------------------------------------------
-   CREA EL IFRAME SIN NINGUNA URL EN EL HTML
+   CREA EL IFRAME FINAL
 ---------------------------------------------------------- */
 function launchFromEncoded(b64) {
     const iframe = document.createElement("iframe");
@@ -110,17 +115,18 @@ function launchFromEncoded(b64) {
         width:100vw; height:100vh;
         border:none; z-index:9999;
     `;
-    document.body.innerHTML = "";
+    document.body.innerHTML = ""; // Limpiamos DOM
     document.body.appendChild(iframe);
 }
 
 /* ----------------------------------------------------------
-   PROCESO PRINCIPAL
+   PROCESO PRINCIPAL CON RENDER INVISIBLE
 ---------------------------------------------------------- */
 (async () => {
     try {
         document.getElementById("status").textContent = "Leyendo GLB…";
 
+        // 1️⃣ Cargar GLB
         const glb = await loadGLB(MODEL_URL);
         const manifest = rebuildManifest(glb);
 
@@ -129,12 +135,23 @@ function launchFromEncoded(b64) {
             return;
         }
 
-        // Mantener push de la URL
+        // 2️⃣ Render temporal invisible (en memoria)
+        const tempDiv = document.getElementById("tempContainer");
+        const tempIframe = document.createElement("iframe");
+        tempIframe.src = manifest.runtimeURL;
+        tempDiv.appendChild(tempIframe);
+
+        // Esperar a que se cargue el visor en memoria
+        await new Promise(resolve => {
+            tempIframe.onload = () => resolve();
+        });
+
+        // 3️⃣ Extraer URL y params
         const params = getParams();
         const encoded = buildEncodedURL(manifest.runtimeURL, params);
 
+        // 4️⃣ Limpiar DOM y lanzar iframe final
         document.getElementById("status").textContent = "Abriendo visor…";
-
         launchFromEncoded(encoded);
 
     } catch (e) {
