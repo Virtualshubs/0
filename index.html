@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Loader Interoperable - HTML desde GLB</title>
+<title>Loader Interoperable</title>
 <style>
   body {
     margin: 0;
@@ -27,10 +27,10 @@
 /* ----------------------------------------------------------
    CONFIG
 ---------------------------------------------------------- */
-const MODEL_URL = "https://virtualshubs.github.io/personalizador/darkroom.glb"; // apunta al GLB que descargaste del sellado
+const MODEL_URL = "https://virtualshubs.github.io/personalizador/cubocubico.glb";
 
 /* ----------------------------------------------------------
-   FUNCIONES AUXILIARES PARA LEER GLB
+   LECTOR GLB (mínimo y listo para ofuscar)
 ---------------------------------------------------------- */
 async function loadGLB(url) {
     const res = await fetch(url);
@@ -63,29 +63,55 @@ async function loadGLB(url) {
 }
 
 /* ----------------------------------------------------------
-   RECUPERAR MANIFEST Y HTML DESDE EXTRAS
+   RECUPERAR MANIFEST DESDE EXTRAS -> manifestChunks[]
 ---------------------------------------------------------- */
 function rebuildManifest(scene) {
     if (!scene.nodes) return null;
+
     for (const n of scene.nodes) {
         if (n.extras && n.extras.manifestChunks) {
             const base64 = n.extras.manifestChunks.join("");
-            return JSON.parse(decodeURIComponent(escape(atob(base64))));
+            return JSON.parse(atob(base64));
         }
     }
     return null;
 }
 
-function rebuildHTML(scene) {
-    if (!scene.nodes) return null;
-    for (const n of scene.nodes) {
-        if (n.extras && n.extras.htmlChunks) {
-            const base64 = n.extras.htmlChunks.join("");
-            const html = decodeURIComponent(escape(atob(base64)));
-            return html;
-        }
+/* ----------------------------------------------------------
+   PARAMS DE LA URL DEL LOADER (dinámicos)
+---------------------------------------------------------- */
+function getParams() {
+    const q = new URLSearchParams(location.search);
+    const out = {};
+    for (const [k, v] of q.entries()) out[k] = decodeURIComponent(v);
+    return out;
+}
+
+/* ----------------------------------------------------------
+   CREA URL DEL VISOR + METADATOS INYECTADOS → BASE64
+---------------------------------------------------------- */
+function buildEncodedURL(base, params) {
+    const u = new URL(base);
+    for (const k in params) {
+        u.searchParams.set(k, params[k]);
     }
-    return null;
+    return btoa(u.toString());
+}
+
+/* ----------------------------------------------------------
+   CREA EL IFRAME SIN NINGUNA URL EN EL HTML
+---------------------------------------------------------- */
+function launchFromEncoded(b64) {
+    const iframe = document.createElement("iframe");
+    iframe.src = atob(b64);
+    iframe.style.cssText = `
+        position:fixed;
+        top:0; left:0;
+        width:100vw; height:100vh;
+        border:none; z-index:9999;
+    `;
+    document.body.innerHTML = "";
+    document.body.appendChild(iframe);
 }
 
 /* ----------------------------------------------------------
@@ -97,28 +123,24 @@ function rebuildHTML(scene) {
 
         const glb = await loadGLB(MODEL_URL);
         const manifest = rebuildManifest(glb);
-        const htmlCode = rebuildHTML(glb);
 
-        if (!htmlCode) {
-            document.getElementById("status").textContent = "No se encontró HTML en el GLB.";
+        if (!manifest || !manifest.runtimeURL) {
+            document.getElementById("status").textContent =
+                "No se encontró manifest.";
             return;
         }
 
-        document.getElementById("status").textContent = "Cargando visor…";
+        const params = getParams();
+        const encoded = buildEncodedURL(manifest.runtimeURL, params);
 
-        // --- Crear BLOB y mostrarlo sin exponer la URL ---
-        const blob = new Blob([htmlCode], {type: "text/html"});
-        const blobURL = URL.createObjectURL(blob);
+        document.getElementById("status").textContent =
+            "Abriendo visor…";
 
-        // Borrar DOM antes de cargar el HTML
-        document.body.textContent = "";
-
-        // Saltar al HTML generado
-        location.href = blobURL;
+        launchFromEncoded(encoded);
 
     } catch (e) {
         console.error(e);
-        document.getElementById("status").textContent = "Error cargando GLB.";
+        document.getElementById("status").textContent = "Error cargando.";
     }
 })();
 </script>
