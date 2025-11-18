@@ -2,12 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Loader Interoperable</title>
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Loader Interoperable - HTML desde GLB</title>
 <style>
   body {
     margin: 0;
-    background: #fff;
+    background: #000;
     color: white;
     font-family: Arial, sans-serif;
   }
@@ -17,30 +16,34 @@
     width: 100%;
     text-align: center;
     font-size: 18px;
-    z-index: 9999;
   }
 </style>
 </head>
 <body>
 
-<div id="status"></div>
+<div id="status">Cargando GLB…</div>
 
 <script>
 /* ----------------------------------------------------------
    CONFIG
 ---------------------------------------------------------- */
-const MODEL_URL = "https://virtualshubs.github.io/personalizador/cubocubico.glb";
+const MODEL_URL = "https://virtualshubs.github.io/personalizador/darkroom.glb"; // apunta al GLB que descargaste del sellado
 
 /* ----------------------------------------------------------
-   LECTOR GLB
+   FUNCIONES AUXILIARES PARA LEER GLB
 ---------------------------------------------------------- */
 async function loadGLB(url) {
     const res = await fetch(url);
     const buf = await res.arrayBuffer();
-    const dv = new DataView(buf, 0, 12);
-    if (dv.getUint32(0, true) !== 0x46546C67) throw new Error("GLB inválido");
 
-    let off = 12, json = null;
+    const dv = new DataView(buf, 0, 12);
+    if (dv.getUint32(0, true) !== 0x46546C67) {
+        throw new Error("GLB inválido");
+    }
+
+    let off = 12;
+    let json = null;
+
     while (off < buf.byteLength) {
         const v = new DataView(buf, off, 8);
         const len = v.getUint32(0, true);
@@ -48,61 +51,41 @@ async function loadGLB(url) {
         off += 8;
 
         const sub = buf.slice(off, off + len);
-        if (type === 0x4E4F534A) json = new TextDecoder().decode(sub);
+
+        if (type === 0x4E4F534A) { // JSON
+            json = new TextDecoder().decode(sub);
+        }
 
         off += len;
     }
+
     return JSON.parse(json);
 }
 
 /* ----------------------------------------------------------
-   RECUPERAR MANIFEST
+   RECUPERAR MANIFEST Y HTML DESDE EXTRAS
 ---------------------------------------------------------- */
 function rebuildManifest(scene) {
     if (!scene.nodes) return null;
     for (const n of scene.nodes) {
-        if (n.extras?.manifestChunks) {
-            return JSON.parse(atob(n.extras.manifestChunks.join("")));
+        if (n.extras && n.extras.manifestChunks) {
+            const base64 = n.extras.manifestChunks.join("");
+            return JSON.parse(decodeURIComponent(escape(atob(base64))));
         }
     }
     return null;
 }
 
-/* ----------------------------------------------------------
-   OBTENER PARAMS DE LA URL
----------------------------------------------------------- */
-function getParams() {
-    const q = new URLSearchParams(location.search);
-    const out = {};
-    for (const [k, v] of q.entries()) out[k] = decodeURIComponent(v);
-    return out;
-}
-
-/* ----------------------------------------------------------
-   CONSTRUIR URL CODIFICADA
----------------------------------------------------------- */
-function buildEncodedURL(base, params) {
-    const u = new URL(base);
-    for (const k in params) u.searchParams.set(k, params[k]);
-    return btoa(u.toString());
-}
-
-/* ----------------------------------------------------------
-   LANZAR IFRAME SELLADO
----------------------------------------------------------- */
-function launchFromEncoded(b64) {
-    const iframe = document.createElement("iframe");
-    iframe.src = atob(b64);
-    iframe.style.cssText = `
-        position:fixed;
-        top:0; left:0;
-        width:100vw; height:100vh;
-        border:none; z-index:9999;
-    `;
-    
-    // Borrar todo el DOM visible del loader antes de agregar el iframe
-    document.body.innerHTML = "";
-    document.body.appendChild(iframe);
+function rebuildHTML(scene) {
+    if (!scene.nodes) return null;
+    for (const n of scene.nodes) {
+        if (n.extras && n.extras.htmlChunks) {
+            const base64 = n.extras.htmlChunks.join("");
+            const html = decodeURIComponent(escape(atob(base64)));
+            return html;
+        }
+    }
+    return null;
 }
 
 /* ----------------------------------------------------------
@@ -110,29 +93,35 @@ function launchFromEncoded(b64) {
 ---------------------------------------------------------- */
 (async () => {
     try {
-        const status = document.getElementById("status");
-        status.textContent = "Leyendo GLB…";
+        document.getElementById("status").textContent = "Leyendo GLB…";
 
         const glb = await loadGLB(MODEL_URL);
         const manifest = rebuildManifest(glb);
-        if (!manifest?.runtimeURL) {
-            status.textContent = "No se encontró manifest.";
+        const htmlCode = rebuildHTML(glb);
+
+        if (!htmlCode) {
+            document.getElementById("status").textContent = "No se encontró HTML en el GLB.";
             return;
         }
 
-        const params = getParams();
-        const encoded = buildEncodedURL(manifest.runtimeURL, params);
+        document.getElementById("status").textContent = "Cargando visor…";
 
-        status.textContent = "Abriendo visor…";
+        // --- Crear BLOB y mostrarlo sin exponer la URL ---
+        const blob = new Blob([htmlCode], {type: "text/html"});
+        const blobURL = URL.createObjectURL(blob);
 
-        launchFromEncoded(encoded);
+        // Borrar DOM antes de cargar el HTML
+        document.body.textContent = "";
+
+        // Saltar al HTML generado
+        location.href = blobURL;
+
     } catch (e) {
         console.error(e);
-        document.getElementById("status").textContent = "Error cargando.";
+        document.getElementById("status").textContent = "Error cargando GLB.";
     }
 })();
 </script>
 
 </body>
 </html>
-
