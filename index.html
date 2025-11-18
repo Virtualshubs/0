@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Loader Interoperable</title>
+<title>Loader Interoperable Ajustado</title>
 <style>
   body {
     margin: 0;
@@ -30,7 +30,7 @@
 const MODEL_URL = "https://virtualshubs.github.io/personalizador/cubocubico.glb";
 
 /* ----------------------------------------------------------
-   LECTOR GLB (mínimo y listo para ofuscar)
+   LECTOR GLB (mínimo)
 ---------------------------------------------------------- */
 async function loadGLB(url) {
     const res = await fetch(url);
@@ -63,7 +63,7 @@ async function loadGLB(url) {
 }
 
 /* ----------------------------------------------------------
-   RECUPERAR MANIFEST DESDE EXTRAS -> manifestChunks[]
+   RECUPERAR URL DESDE EXTRAS -> manifestChunks[]
 ---------------------------------------------------------- */
 function rebuildManifest(scene) {
     if (!scene.nodes) return null;
@@ -125,16 +125,15 @@ function launchFromEncoded(b64) {
         const manifest = rebuildManifest(glb);
 
         if (!manifest || !manifest.runtimeURL) {
-            document.getElementById("status").textContent =
-                "No se encontró manifest.";
+            document.getElementById("status").textContent = "No se encontró manifest.";
             return;
         }
 
+        // Mantener push de la URL
         const params = getParams();
         const encoded = buildEncodedURL(manifest.runtimeURL, params);
 
-        document.getElementById("status").textContent =
-            "Abriendo visor…";
+        document.getElementById("status").textContent = "Abriendo visor…";
 
         launchFromEncoded(encoded);
 
