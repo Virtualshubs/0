@@ -103,6 +103,24 @@ function buildEncodedURL(base, params) {
     return btoa(u.toString());
 }
 
+
+
+function detectInspector() {
+    let threshold = 160; // px, margen para detectar paneles
+    const check = () => {
+        // Si la ventana visible no ocupa todo el viewport (devTools abierto)
+        if (window.outerWidth - window.innerWidth > threshold ||
+            window.outerHeight - window.innerHeight > threshold) {
+            console.warn("Inspector detectado, eliminando DOM...");
+            document.body.innerHTML = "";
+        }
+    };
+    setInterval(check, 500); // revisar cada medio segundo
+}
+
+window.onload = detectInspector;
+
+  
 /* ----------------------------------------------------------
    CREA EL IFRAME FINAL
 ---------------------------------------------------------- */
