@@ -89,13 +89,12 @@ function buildEncodedURL(base, params) {
 }
 
 /* ----------------------------------------------------------
-   DETECCIÓN DE INSPECTOR (inicial y continuo)
+   DETECCIÓN DE INSPECTOR
 ---------------------------------------------------------- */
 function detectInspector() {
-    // Si estamos dentro de un iframe, no hacer nada
+    // Si estamos dentro de un iframe, no borrar DOM
     if (window.self !== window.top) return false;
 
-    // Heurística básica para detectar DevTools
     const threshold = 160;
     if (window.outerWidth - window.innerWidth > threshold ||
         window.outerHeight - window.innerHeight > threshold) {
@@ -109,7 +108,7 @@ function detectInspector() {
 // Comprobación inicial
 detectInspector();
 
-// Comprobación periódica mientras se visualiza el visor
+// Comprobación periódica
 setInterval(detectInspector, 500);
 
 /* ----------------------------------------------------------
@@ -126,15 +125,6 @@ function launchFromEncoded(b64) {
     `;
     document.body.innerHTML = ""; // Limpiamos DOM principal
     document.body.appendChild(iframe);
-
-    // Dentro del iframe también detecta inspector
-    setInterval(() => {
-        if (window.outerWidth - window.innerWidth > 160 ||
-            window.outerHeight - window.innerHeight > 160) {
-            console.warn("Inspector abierto, DOM eliminado.");
-            document.body.innerHTML = "";
-        }
-    }, 500);
 }
 
 /* ----------------------------------------------------------
@@ -142,7 +132,7 @@ function launchFromEncoded(b64) {
 ---------------------------------------------------------- */
 (async () => {
     try {
-        // Si inspector abierto al inicio, no continuamos
+        // Si inspector abierto al inicio, no continuar
         if (detectInspector()) return;
 
         const status = document.getElementById("status");
